@@ -7,7 +7,7 @@ Hardware used
  - Adafruit 14-segment 2-digit 0.54" tall [LED display](https://www.adafruit.com/products/3129)
  - Maxim MAX31855PMB1 thermoouple demo board and included Omega K-type thermocouple (which plugs into a mini-Omega connector) 
  and has a high-temperature sheath. 
- Adafruit also makes a [MAX31855 breakout](https://www.adafruit.com/products/269, I have it too.
+ Adafruit also makes a [MAX31855 breakout](https://www.adafruit.com/products/269), I have it too.
  The Adafruit board does not include the thermocouple and uses screw terminals to connect the thermocouple
  - solderless breadboard such as this [Adafruit half-size](https://www.adafruit.com/products/64)
  - USB power supply to run the combination when not plugged into a PC
