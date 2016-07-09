@@ -1,5 +1,6 @@
 Oven set to 450. Cast iron pan with lid
 Note: apparent library bugs. TempC works always but TempF sometimes reports 0. Why does this not corrupt the min?
+See times 713 and 1833
 
 @0 Bread in I don't recall. Bake time about 35 min but I forgot to start timer
 @2008 Door opened, lid removed, temp set to 375 for 15 min
