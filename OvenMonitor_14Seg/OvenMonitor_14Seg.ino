@@ -35,7 +35,14 @@
 
 #include <SPI.h>
 #include "Adafruit_MAX31855.h"
-#include <Wire.h>
+
+// Include the lowest level I2C library
+#if defined (__MK20DX256__) || defined (__MK20DX128__) 	// Teensy 3.1 or 3.2 || Teensy 3.0
+#include <i2c_t3.h>		
+#else
+#include <Wire.h>	// for AVR I2C library
+#endif
+
 #include "Adafruit_LEDBackpack.h"
 #include "Adafruit_GFX.h"
 
@@ -97,24 +104,7 @@ void setup() {
   
   alpha4.clear();
   alpha4.writeDisplay();
-//
-//  // turn on all segments left to right
-//  alpha4.writeDigitRaw(3, 0x0);
-//  alpha4.writeDigitRaw(0, 0xFFFF);
-//  alpha4.writeDisplay();
-//  delay(200);
-//  alpha4.writeDigitRaw(0, 0x0);
-//  alpha4.writeDigitRaw(1, 0xFFFF);
-//  alpha4.writeDisplay();
-//  delay(200);
-//  alpha4.writeDigitRaw(1, 0x0);
-//  alpha4.writeDigitRaw(2, 0xFFFF);
-//  alpha4.writeDisplay();
-//  delay(200);
-//  alpha4.writeDigitRaw(2, 0x0);
-//  alpha4.writeDigitRaw(3, 0xFFFF);
-//  alpha4.writeDisplay();
-//  delay(200);
+
 
   alpha4.writeDigitAscii(0, 'M');
   alpha4.writeDigitAscii(1, 'A');
@@ -137,26 +127,43 @@ void setup() {
   f_min = f_now;
   f_max = f_now;
   
+  alpha4.setBrightness(0x07);		// 15 is max bright
+  
 }
 
-
+/**
+These make the loop time consistent by adjusting one of the delay()
+*/
+uint32_t time_old, time_now, time_loop, loop_tweak=200;
 
 void loop() {
-  // basic readout test, just print the current temp
-   Serial.print("Internal Temp = ");
-   Serial.println(thermocouple.readInternal());
+  // print temp every 5 seconds along with min and max
+  time_old = time_now;  // about 5 seconds ago
+  time_now = millis();  // current time
+  Serial.print("@ ");
+  Serial.print(time_now/1000);
+   Serial.print(" Die= ");
+   Serial.print(thermocouple.readInternal());
+   Serial.print(" C, ");
 
    double c = thermocouple.readCelsius();
    if (isnan(c)) {
      Serial.println("Something wrong with thermocouple!");
    } else {
-     Serial.print("C = "); 
-     Serial.println(c);
+     Serial.print("TC= "); 
+   Serial.print(c);
+	 Serial.print(" C | ");
    }
-   Serial.print("F = ");
-
-   f_now = thermocouple.readFarenheit();
-   Serial.println(f_now);
+   f_now = thermocouple.readFarenheit(); 
+    if ((f_max > 100) && (f_now < 5)) 
+    {
+      // probably an oven, and there is a bug in thermocouple.readFarenheit()
+      Serial.println();
+      Serial.print("Error in thermocouple.readFarenheit(): ");
+      Serial.println(f_now);
+    }
+   Serial.print(f_now);    // ??? sometimes prints 0.00
+   Serial.print(" F, ");
    
 /**
  *  Update min and max but we want these to self-adjust around the mean
@@ -167,28 +174,33 @@ void loop() {
  *  If temp peaks and then drops, by maybe 5 deg, we've reached a value
  *  higher than the setpoint, so reset the min.
  *  
+ *  ??? If f_now is really 0.00 why does f_min not get set to 0?
  */
    if (f_max < f_now) f_max = f_now;
    if (f_min > f_now) f_min = f_now;
    
-   
-   
-   
-   
-   
-   
-   Serial.println(f_now);
-   
-   display_temp_f (f_min, '-');
-   delay(1000);
    display_temp_f (f_now, 'F');
-   delay(1000);
+   delay(3000 - loop_tweak);   // deduct some process time 0 min to 1000 perhaps
+   display_temp_f (f_min, '-');
+   delay(1000);   
    display_temp_f (f_max, '+');
    delay(1000);
    
+   Serial.print("min/max = ");
+   Serial.print(f_min);
+   Serial.print(" / ");
+   Serial.print(f_max);
 
+  // 5 seconds through loop, plus processing time
+   
+   Serial.print(" loop= ");
+   Serial.println(time_loop);
 
-  delay(1000);
+   time_loop = millis() - time_now;
+   if (time_loop != 5000)
+   {
+      time_loop > 5000 ? loop_tweak++ : loop_tweak-- ;
+    }
 }
 
 void display_temp_f (double degf, char last)
@@ -211,12 +223,13 @@ void display_temp_f (double degf, char last)
       degf = 999;
     }
    // temp is 0..999
-   Serial.println(degf);
+//   Serial.println(degf);
    
   uint8_t hundreds = degf/100;   // 0..9
 
-  Serial.print("Hundreds=");
-  Serial.println(hundreds);
+  // debug
+//  Serial.print("Hundreds=");
+//  Serial.println(hundreds);
 
   if (hundreds > 0)
   {
