@@ -10,7 +10,7 @@
  /**
   *  What this program does
   *  Measures temp once/second
-  *  Calcs drift around a guessed setpoint
+  *  Calcs drift around a guessed setpoint (setpoint not implemented yet)
   *  
   *  Example: oven is at room temp 70F, turns on and ramps to 400F, then varies from 370 to 420
   *  
@@ -31,6 +31,16 @@
   *  undershoot are symmetrical, then the setpoint should be the point of inflection (where the sign of
   *  the first derivate changes). It would be interesting to see if this is indeed the case.
   *  
+  */
+  /**
+  Revisions
+  2016 Jul 09 bboyes  added neg temp support, seems to work
+  */
+
+  /**
+    TODO Maybe, or just switch to the ILI9341 touchscreen
+    Change display to two screens, text and then data
+    "AMB=" "NOW=" "MIN=" "MAX=" "SET=""
   */
 
 #include <SPI.h>
@@ -149,6 +159,8 @@ void loop() {
    double c = thermocouple.readCelsius();
    if (isnan(c)) {
      Serial.println("Something wrong with thermocouple!");
+     error_display();
+     delay(1000);
    } else {
      Serial.print("TC= "); 
    Serial.print(c);
@@ -203,29 +215,43 @@ void loop() {
     }
 }
 
+/**
+  Display temp on 4-digit 14-segment LED display
+
+  Adding neg temp display 2016 Jul 09
+  @param last - the char to display in rightmost digit, e.g. [FC+-]
+  where + or - are max and min
+*/
 void display_temp_f (double degf, char last)
 {
    // just display the integer part on a 4-segment LED display
-//   f = 325.55;  // dummy data to test
-   uint16_t temp_in_f = (uint16_t) degf;     
 
-  if (degf < 0)
+   int16_t temp_in_f = (int16_t) degf;     
+   boolean isneg = false;
+
+ //  Serial.print(" In display F: ");
+//   Serial.print(degf);
+//   Serial.print(" ");
+//   Serial.println(temp_in_f);
+
+  if (temp_in_f < 0)
   {
-    Serial.print("Temp is negative:");
-    Serial.println(degf);
-    degf = 0;  // TODO make neg temps work
+    Serial.print("Neg: ");
+    Serial.println(temp_in_f);
+    isneg = true;
+    temp_in_f = abs(temp_in_f);   // absolute value, so positive from here on
   }
 
-   if (degf > 999) 
+   if (temp_in_f > 999) 
     {
       Serial.print("Clipping! Temp exceeds 999F:");
-      Serial.println(degf);
-      degf = 999;
+      Serial.println(temp_in_f);
+      temp_in_f = 999;
     }
    // temp is 0..999
 //   Serial.println(degf);
    
-  uint8_t hundreds = degf/100;   // 0..9
+  uint8_t hundreds = temp_in_f/100;   // 0..9
 
   // debug
 //  Serial.print("Hundreds=");
@@ -235,22 +261,41 @@ void display_temp_f (double degf, char last)
   {
     alpha4.writeDigitAscii(0, hundreds+0x30);
   }
+  else if (isneg)
+  {
+    alpha4.writeDigitAscii(0, '-');
+  }
   else alpha4.writeDigitAscii(0, ' ');    // ascii space is 0x32
 
-  degf = degf - (hundreds * 100);  // now temp is 0..99
+  temp_in_f = temp_in_f - (hundreds * 100);  // now temp is 0..99
 
-  uint8_t tens = degf/10;  // 0..9
+  uint8_t tens = temp_in_f/10;  // 0..9
   
-  alpha4.writeDigitAscii(1, tens+0x30);
+  if ((0 == hundreds) && (0 == tens))   // suppress leading 0s
+  {
+    alpha4.writeDigitAscii(1, ' ');    // ascii space is 0x32
+  }
+  else alpha4.writeDigitAscii(1, tens+0x30);
 
-  degf = degf - (tens * 10);  // now temp is 0..9
+    // debug
+//  Serial.print("tens=");
+//  Serial.println(tens);
 
-  alpha4.writeDigitAscii(2, degf+0x30);
+  temp_in_f = temp_in_f - (tens * 10);  // now temp is 0..9
+//  Serial.print(" temp_in_f now: ");
+//  Serial.println(temp_in_f);
+
+  alpha4.writeDigitAscii(2, temp_in_f+0x30);  // even if 0
 
   alpha4.writeDigitAscii(3, last);
-  // alpha4.writeDigitAscii(1, '-');
-  // alpha4.writeDigitAscii(2, '+');
   alpha4.writeDisplay();
   }
 
-
+void error_display(void)
+{
+  alpha4.writeDigitAscii(0, 'B');
+  alpha4.writeDigitAscii(1, 'A');
+  alpha4.writeDigitAscii(2, 'D');
+  alpha4.writeDigitAscii(3, '!');
+  alpha4.writeDisplay();
+}
